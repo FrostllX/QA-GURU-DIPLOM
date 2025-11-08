@@ -112,26 +112,38 @@ jobs:
           ALLURE_TOKEN: ${{ secrets.ALLURE_TOKEN }}
           LAUNCH_NAME: ${{ env.LAUNCH_NAME }}
         run: |
-          # Скачиваем allurectl
+          set -euo pipefail
+          
+          # Скачать allurectl
           curl -sL -o allurectl \
             https://github.com/allure-framework/allurectl/releases/latest/download/allurectl_linux_amd64
           chmod +x allurectl
 
           # Пытаемся загрузить результаты; лог сохраним, чтобы вытащить ID лаунча
-          set -o pipefail
-          ./allurectl upload \
-            --endpoint "$ALLURE_ENDPOINT" \
-            --token "$ALLURE_TOKEN" \
+          ./allurectl upload "allure-results" \
+            -e "$ALLURE_ENDPOINT" \
+            -t "$ALLURE_TOKEN" \
             --project-id "$ALLURE_PROJECT_ID" \
-            --results "allure-results" \
             --launch-name "$LAUNCH_NAME" \
-            --tags "github,${{ github.ref_name }}" | tee allurectl.log
+            --launch-tags "github" \
+            --launch-tags "${{ github.ref_name }}" \
+            -o json | tee allurectl.json
 
-          # Попытка вытащить launchId из лога (под разные версии allurectl)
+          # Попытаемся достать ID лаунча из JSON; если jq нет — установим
+          if ! command -v jq >/dev/null 2>&1; then
+           sudo apt-get update -y
+           sudo apt-get install -y jq
+          fi
+
           # Если не найдём — оставим пустым, затем дадим ссылку на список лаунчей с поиском по имени
-          LAUNCH_ID=$(grep -Eo 'launch(id)?[:= ][0-9]+' allurectl.log | grep -Eo '[0-9]+' | tail -n1 || true)
-          echo "launch_id=$LAUNCH_ID" >> "$GITHUB_OUTPUT"
+          LAUNCH_ID=$(
+           jq -r '..|.launch? // empty | .id? // empty' allurectl.json | tail -n1
+          )
+          if [ -z "${LAUNCH_ID:-}" ] || [ "${LAUNCH_ID}" = "null" ]; then
+           LAUNCH_ID=$(jq -r '..|.id? // empty' allurectl.json | grep -E '^[0-9]+$' | tail -n1 || true)
+          fi
 
+          echo "launch_id=${LAUNCH_ID:-}" >> "$GITHUB_OUTPUT"
       # --- Уведомление в Telegram (со статистикой и ссылкой на Launch) ---
       - name: Notify Telegram
         if: always()
