@@ -1,0 +1,31 @@
+{
+  "name": "qa-guru-diplom",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "npx playwright test",
+    "ui": "npx playwright test --ui",
+    "test:allure": "playwright test && allure generate allure-results -o allure-report --clean",
+    "allure:serve": "allure serve allure-results",
+    "allure:generate": "allure generate allure-results -o allure-report --clean",
+    "allure:clean:win": "if exist allure-results rmdir /s /q allure-results"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FrostllX/QA-GURU-DIPLOM.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/FrostllX/QA-GURU-DIPLOM/issues"
+  },
+  "homepage": "https://github.com/FrostllX/QA-GURU-DIPLOM#readme",
+  "devDependencies": {
+    "@faker-js/faker": "^10.1.0",
+    "@playwright/test": "^1.56.1",
+    "@types/node": "^24.10.0",
+    "allure-playwright": "^3.4.2"
+  }
+}

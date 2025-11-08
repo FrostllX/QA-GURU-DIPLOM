@@ -1,0 +1,196 @@
+name: QA Guru Diplom tests
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+
+    env:
+      # Имя лаунча — используем в TestOps и в Telegram
+      LAUNCH_NAME: "QA Guru Diplom • run #${{ github.run_number }} • ${{ github.ref_name }}"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+
+      - name: Run Playwright tests
+        run: npx playwright test
+
+      # --- артефакты Allure (локальный и gh-pages) ---
+      - uses: actions/upload-artifact@v4
+        if: always()
+        continue-on-error: true
+        with:
+          name: allure-results
+          path: allure-results/
+          retention-days: 20
+
+      - uses: simple-elf/allure-report-action@master
+        if: always()
+        id: allure-report
+        with:
+          allure_results: allure-results
+          gh_pages: gh-pages
+          allure_report: allure-report
+          allure_history: allure-history
+          keep_reports: 20
+
+      - name: Publish Allure report to GitHub Pages
+        if: always()
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: allure-history
+
+      # --- Парсим summary.json для статистики ---
+      - name: Extract Allure stats
+        if: always()
+        id: allure-stats
+        shell: bash
+        run: |
+          FILE="allure-report/widgets/summary.json"
+          if [ -f "$FILE" ]; then
+            echo "summary file found"
+          else
+            echo "No summary.json, trying to build a minimal summary from results..."
+            # если репорт не собрался (редко), создадим заглушку
+            mkdir -p allure-report/widgets
+            cat > "$FILE" <<EOF
+            {"statistic":{"total":0,"passed":0,"failed":0,"broken":0,"skipped":0,"unknown":0}}
+            EOF
+          fi
+
+          # jq обычно есть в Ubuntu image; если нет — поставим
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update -y
+            sudo apt-get install -y jq
+          fi
+
+          TOTAL=$(jq -r '.statistic.total // 0' "$FILE")
+          PASSED=$(jq -r '.statistic.passed // 0' "$FILE")
+          FAILED=$(jq -r '.statistic.failed // 0' "$FILE")
+          BROKEN=$(jq -r '.statistic.broken // 0' "$FILE")
+          SKIPPED=$(jq -r '.statistic.skipped // 0' "$FILE")
+          UNKNOWN=$(jq -r '.statistic.unknown // 0' "$FILE")
+
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "passed=$PASSED" >> "$GITHUB_OUTPUT"
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+          echo "broken=$BROKEN" >> "$GITHUB_OUTPUT"
+          echo "skipped=$SKIPPED" >> "$GITHUB_OUTPUT"
+          echo "unknown=$UNKNOWN" >> "$GITHUB_OUTPUT"
+
+      # --- Отправка результатов в Allure TestOps ---
+      - name: Upload to Allure TestOps
+        if: always()
+        id: upload-testops
+        env:
+          ALLURE_ENDPOINT: ${{ secrets.ALLURE_ENDPOINT }}
+          ALLURE_PROJECT_ID: ${{ secrets.ALLURE_PROJECT_ID }}
+          ALLURE_TOKEN: ${{ secrets.ALLURE_TOKEN }}
+          LAUNCH_NAME: ${{ env.LAUNCH_NAME }}
+        run: |
+          # Скачиваем allurectl
+          curl -sL -o allurectl \
+            https://github.com/allure-framework/allurectl/releases/latest/download/allurectl_linux_amd64
+          chmod +x allurectl
+
+          # Пытаемся загрузить результаты; лог сохраним, чтобы вытащить ID лаунча
+          set -o pipefail
+          ./allurectl upload \
+            --endpoint "$ALLURE_ENDPOINT" \
+            --token "$ALLURE_TOKEN" \
+            --project-id "$ALLURE_PROJECT_ID" \
+            --results "allure-results" \
+            --launch-name "$LAUNCH_NAME" \
+            --tags "github,${{ github.ref_name }}" | tee allurectl.log
+
+          # Попытка вытащить launchId из лога (под разные версии allurectl)
+          # Если не найдём — оставим пустым, затем дадим ссылку на список лаунчей с поиском по имени
+          LAUNCH_ID=$(grep -Eo 'launch(id)?[:= ][0-9]+' allurectl.log | grep -Eo '[0-9]+' | tail -n1 || true)
+          echo "launch_id=$LAUNCH_ID" >> "$GITHUB_OUTPUT"
+
+      # --- Уведомление в Telegram (со статистикой и ссылкой на Launch) ---
+      - name: Notify Telegram
+        if: always()
+        env:
+          BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPORT_URL: ${{ secrets.ALLURE_REPORT_URL }}
+          BRANCH: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          ALLURE_ENDPOINT: ${{ secrets.ALLURE_ENDPOINT }}
+          ALLURE_PROJECT_ID: ${{ secrets.ALLURE_PROJECT_ID }}
+          LAUNCH_NAME: ${{ env.LAUNCH_NAME }}
+          LAUNCH_ID: ${{ steps.upload-testops.outputs.launch_id }}
+          # счётчики
+          TOTAL:  ${{ steps.allure-stats.outputs.total }}
+          PASSED: ${{ steps.allure-stats.outputs.passed }}
+          FAILED: ${{ steps.allure-stats.outputs.failed }}
+          BROKEN: ${{ steps.allure-stats.outputs.broken }}
+          SKIPPED: ${{ steps.allure-stats.outputs.skipped }}
+          UNKNOWN: ${{ steps.allure-stats.outputs.unknown }}
+        run: |
+          urlencode() {
+          python3 - <<'PY'
+          import sys, urllib.parse
+          print(urllib.parse.quote(sys.argv[1]))
+          PY
+          }
+
+          case "$STATUS" in
+            success) EMOJI="✅";;
+            failure) EMOJI="❌";;
+            cancelled) EMOJI="⚪";;
+            *) EMOJI="⚠️";;
+          esac
+
+          SHORT_SHA="${SHA:0:7}"
+
+          # Ссылка на конкретный launch: если знаем ID — прямой URL, иначе — страница Launches с поиском по имени
+          if [ -n "$LAUNCH_ID" ]; then
+            LAUNCH_URL="${ALLURE_ENDPOINT%/}/launch/${LAUNCH_ID}"
+          else
+            Q=$(urlencode "$LAUNCH_NAME")
+            LAUNCH_URL="${ALLURE_ENDPOINT%/}/launches?projectId=${ALLURE_PROJECT_ID}&search=$Q"
+          fi
+
+          # Текст уведомления (Markdown)
+          MSG="*${EMOJI} CI: ${STATUS^^}*\n"\
+          "*Repo:* \`${REPO}\`\n"\
+          "*Branch:* \`${BRANCH}\`\n"\
+          "*Commit:* \`${SHORT_SHA}\`\n"\
+          "*Launch:* \`${LAUNCH_NAME}\`\n"\
+          "*Tests:* Total: ${TOTAL} | Passed: ${PASSED} | Failed: ${FAILED} | Broken: ${BROKEN} | Skipped: ${SKIPPED}\n"\
+          "[GitHub Actions run](${RUN_URL})\n"\
+          "[Allure Launch](${LAUNCH_URL})"
+
+          # Добавим ссылку на статический Allure report (GitHub Pages), если задан
+          if [ -n "$REPORT_URL" ]; then
+            MSG="$MSG\n[Allure Report]($REPORT_URL)"
+          fi
+
+          # Отправка
+          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -d chat_id="${CHAT_ID}" \
+            -d parse_mode="Markdown" \
+            --data-urlencode text="$MSG" >/dev/null
