@@ -175,7 +175,6 @@ jobs:
             cancelled) EMOJI="⚪";;
             *) EMOJI="⚠️";;
           esac
-
           SHORT_SHA="${SHA:0:7}"
 
           # Ссылка на конкретный launch: если знаем ID — прямой URL, иначе — страница Launches с поиском по имени
@@ -187,19 +186,24 @@ jobs:
           fi
 
           # Текст уведомления (Markdown)
-          MSG="✅ *CI: SUCCESS*\n\
-          *Repo:* [${REPO}](https://github.com/${REPO})\n\
-          *Branch:* \`${BRANCH}\`\n\
-          *Commit:* \`${SHORT_SHA}\`\n\
-          *Launch:* \`${LAUNCH_NAME}\`\n\n\
-          *📊 Test Results:*\n\
-          • *Total:* ${TOTAL}\n\
-          • *Passed:* ${PASSED}\n\
-          • *Failed:* ${FAILED}\n\
-          • *Broken:* ${BROKEN}\n\
-          • *Skipped:* ${SKIPPED}\n\n\
-          [🔗 View GitHub Actions Run](${RUN_URL})\n\
-          [📈 View Allure Launch](${LAUNCH_URL})"
+          MSG="$(cat <<EOF
+          ${EMOJI} *CI: ${STATUS^^}*
+          *Repo:* \`${REPO}\`
+          *Branch:* \`${BRANCH}\`
+          *Commit:* \`${SHORT_SHA}\`
+          *Launch:* \`${LAUNCH_NAME}\`
+
+          *📊 Test Results:*
+          • *Total:* ${TOTAL}
+          • *Passed:* ${PASSED}
+          • *Failed:* ${FAILED}
+          • *Broken:* ${BROKEN}
+          • *Skipped:* ${SKIPPED}
+
+          [🔗 View GitHub Actions Run](${RUN_URL})
+          [📈 View Allure Launch](${LAUNCH_URL})
+          EOF
+          )"
 
           # Добавим ссылку на статический Allure report (GitHub Pages), если задан
           if [ -n "$REPORT_URL" ]; then
@@ -207,7 +211,9 @@ jobs:
           fi
 
           # Отправка
-          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+          RESP=$(curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
             -d chat_id="${CHAT_ID}" \
             -d parse_mode="Markdown" \
-            --data-urlencode text="$MSG" >/dev/null
+            --data-urlencode text="$MSG")
+          echo "Telegram API response: $RESP"
+          echo "$RESP" | grep -q '"ok":true' || exit 1
