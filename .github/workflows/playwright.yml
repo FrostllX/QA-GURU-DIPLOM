@@ -187,14 +187,19 @@ jobs:
           fi
 
           # Текст уведомления (Markdown)
-          MSG="*${EMOJI} CI: ${STATUS^^}*\n"\
-          "*Repo:* \`${REPO}\`\n"\
-          "*Branch:* \`${BRANCH}\`\n"\
-          "*Commit:* \`${SHORT_SHA}\`\n"\
-          "*Launch:* \`${LAUNCH_NAME}\`\n"\
-          "*Tests:* Total: ${TOTAL} | Passed: ${PASSED} | Failed: ${FAILED} | Broken: ${BROKEN} | Skipped: ${SKIPPED}\n"\
-          "[GitHub Actions run](${RUN_URL})\n"\
-          "[Allure Launch](${LAUNCH_URL})"
+          MSG="✅ *CI: SUCCESS*\n\
+          *Repo:* [${REPO}](https://github.com/${REPO})\n\
+          *Branch:* \`${BRANCH}\`\n\
+          *Commit:* \`${SHORT_SHA}\`\n\
+          *Launch:* \`${LAUNCH_NAME}\`\n\n\
+          *📊 Test Results:*\n\
+          • *Total:* ${TOTAL}\n\
+          • *Passed:* ${PASSED}\n\
+          • *Failed:* ${FAILED}\n\
+          • *Broken:* ${BROKEN}\n\
+          • *Skipped:* ${SKIPPED}\n\n\
+          [🔗 View GitHub Actions Run](${RUN_URL})\n\
+          [📈 View Allure Launch](${LAUNCH_URL})"
 
           # Добавим ссылку на статический Allure report (GitHub Pages), если задан
           if [ -n "$REPORT_URL" ]; then
