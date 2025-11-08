@@ -37,7 +37,7 @@ _____
 
 Для генерация отчетов использовать команду ниже:
 ```
-npm run allure
+npm run allure:serve
 ```
 ____
 <a id="allureReport"></a>
