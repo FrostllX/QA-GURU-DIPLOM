@@ -66,16 +66,18 @@ jobs:
         id: allure-stats
         shell: bash
         run: |
+          set -euo pipefail
+
           FILE="allure-report/widgets/summary.json"
+
           if [ -f "$FILE" ]; then
             echo "summary file found"
           else
-            echo "No summary.json, trying to build a minimal summary from results..."
-            # если репорт не собрался (редко), создадим заглушку
-            mkdir -p allure-report/widgets
-            cat > "$FILE" <<EOF
+            echo "No summary.json, creating a minimal one..."
+            mkdir -p "$(dirname "$FILE")"
+            cat > "$FILE" <<'EOF'
             {"statistic":{"total":0,"passed":0,"failed":0,"broken":0,"skipped":0,"unknown":0}}
-            EOF
+          EOF
           fi
 
           # jq обычно есть в Ubuntu image; если нет — поставим
@@ -91,12 +93,14 @@ jobs:
           SKIPPED=$(jq -r '.statistic.skipped // 0' "$FILE")
           UNKNOWN=$(jq -r '.statistic.unknown // 0' "$FILE")
 
-          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
-          echo "passed=$PASSED" >> "$GITHUB_OUTPUT"
-          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
-          echo "broken=$BROKEN" >> "$GITHUB_OUTPUT"
-          echo "skipped=$SKIPPED" >> "$GITHUB_OUTPUT"
-          echo "unknown=$UNKNOWN" >> "$GITHUB_OUTPUT"
+          {
+           echo "total=$TOTAL"
+           echo "passed=$PASSED"
+           echo "failed=$FAILED"
+           echo "broken=$BROKEN"
+           echo "skipped=$SKIPPED"
+           echo "unknown=$UNKNOWN"
+          } >> "$GITHUB_OUTPUT"
 
       # --- Отправка результатов в Allure TestOps ---
       - name: Upload to Allure TestOps
