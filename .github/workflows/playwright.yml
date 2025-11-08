@@ -5,6 +5,8 @@ on:
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
+permissions:
+  contents: write
 
 jobs:
   test:
@@ -51,13 +53,13 @@ jobs:
           keep_reports: 20
 
       - name: Publish Allure report to GitHub Pages
-        if: always()
+        if: always() && github.event_name != 'pull_request'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
           publish_dir: allure-history
-
+          
       # --- Парсим summary.json для статистики ---
       - name: Extract Allure stats
         if: always()
