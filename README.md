@@ -12,6 +12,7 @@
 
 Для удаленного запуска реализован <code>Github</code> action с формированием Allure-отчета и отправкой результатов в <code>Allure TestOps</code> и <code>Telegram</code> при помощи бота.
 
+<a id="autotests"></a>
 ____
 ## ▶️ Запуск автотестов, генерация отчетов
 
