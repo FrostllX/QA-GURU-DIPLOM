@@ -42,14 +42,14 @@ npm run allure:serve
 ```
 ____
 <a id="allureReport"></a>
-## <img width="30" style="vertical-align:middle" title="Allure Report" src="media/logo/allure.svg"> </a> Пример <a target="_blank" href="https://"> Allure-отчета </a>
+## <img width="30" style="vertical-align:middle" title="Allure Report" src="media/logo/allure.svg"> </a> Пример Allure-отчета </a>
 <p align="center">
 <img title="Allure Report" src="media/allure.png">
 </p>
 
 ____
 <a id="allureTestOpsReport"></a>
-## <img width="30" style="vertical-align:middle" title="Allure TestOps Report" src="media/logo/testops-logo.png"> </a> Пример <a target="_blank" href="https://allure.autotests.cloud/"> Allure TestOps-отчета </a>
+## <img width="30" style="vertical-align:middle" title="Allure TestOps Report" src="media/logo/testops-logo.png"> </a> Пример <a target="_blank" href="https://allure.autotests.cloud/launch/49394"> Allure TestOps-отчета </a>
 <p align="center">
 <img title="Allure TestOps Report" src="media/testops.png">
 </p>
