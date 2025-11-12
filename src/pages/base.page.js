@@ -1,5 +1,4 @@
 import { test } from '@playwright/test';
-const URL = 'https://realworld.qa.guru/';
 
 export class BasePage {
     constructor(page) {
@@ -8,7 +7,7 @@ export class BasePage {
     
     async open() {
         return test.step(`Переход на страницу {$URL}`, async (step) => {
-            await this.page.goto(URL);
+            await this.page.goto('/');
         });
     }
 }

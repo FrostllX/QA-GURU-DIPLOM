@@ -43,11 +43,11 @@ export class TodoBuilder {
         return this;
     }
 
-    todosWithExtraParam() {
+    todosWithExtraParam(priority = "extra") {
         this.title = faker.string.alpha({ length: 7 });
         this.doneStatus = faker.datatype.boolean();
         this.description = faker.string.alpha({ length: 15 });
-        this.priority = "extra";
+        this.priority = priority;
         return this;
     }
 
